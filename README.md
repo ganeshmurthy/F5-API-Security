@@ -58,11 +58,18 @@ Arcades are a great way to showcase your quickstart before installation.
 
 ### Architecture diagrams
 
-<!-- CONTRIBUTOR TODO: add architecture diagram. 
 
-*Section is required. Put images in `docs/images` folder* 
+| Layer/Component | Technology | Purpose/Description |
+|-----------------|------------|---------------------|
+| **Orchestration** | OpenShift AI | Container orchestration and GPU acceleration |
+| **Framework** | LLaMA Stack | Standardizes core building blocks and simplifies AI application development |
+| **UI Layer** | Streamlit | User-friendly chatbot interface for chat-based interaction |
+| **LLM** | Llama-3.2-3B-Instruct | Generates contextual responses based on retrieved documents |
+| **Embedding** | all-MiniLM-L6-v2 | Converts text to vector embeddings |
+| **Vector DB** | PostgreSQL + PGVector | Stores embeddings and enables semantic search |
+| **Retrieval** | Vector Search | Retrieves relevant documents based on query similarity |
+| **Storage** | S3 Bucket | Document source for enterprise content |
 
---> 
 
 
 ## Requirements
