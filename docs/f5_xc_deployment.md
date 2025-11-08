@@ -11,10 +11,10 @@ This deployment supports Mesh functionalities only and was performed on the foll
 
 | **Requirement** | **Observed Configuration ("my deployment")** | **Source** |
 |------------------|-----------------------------------------------|-------------|
-| 🖥️ **OCP Node** | `api.gpu-ai.bd.f5.com` *(Control-plane, master, worker, worker-hp roles)* |  |
-| ⚙️ **Kubernetes Version** | `v1.31.6` *(OCP version 4.7 is supported)* |  |
-| 💾 **Minimum Resources** | 4 vCPUs and 8 GB memory per node (minimum) |  |
-| 📦 **StorageClass (Dynamic PVC)** | `lvms-vg1 (default)` *(default indicates dynamic PVC enabled)* |  |
+| **OCP Node** | `api.gpu-ai.bd.f5.com` *(Control-plane, master, worker, worker-hp roles)* |  |
+| **Kubernetes Version** | `v1.31.6` *(OCP version 4.7 is supported)* |  |
+| **Minimum Resources** | 4 vCPUs and 8 GB memory per node (minimum) |  |
+| **StorageClass (Dynamic PVC)** | `lvms-vg1 (default)` *(default indicates dynamic PVC enabled)* |  |
 
 ---
 
@@ -25,8 +25,7 @@ This step ensures the OCP environment meets the **kernel and storage requirement
 Check the cluster state:
 ```bash
 oc get nodes
-```
-```
+
 NAME                STATUS   ROLES                                    AGE   VERSION
 api.gpu-ai.bd.f5.com   Ready    control-plane,master,worker,worker-hp   221d  v1.31.6
 ```
@@ -44,9 +43,58 @@ HugePages must be configured when deploying Mesh as OCP pods.
 **Steps:**
 1. **Label the Node:**  
    Assign custom role `worker-hp` to target node.
+
+```bash
+╰─ oc label node api.gpu-ai.bd.f5.com node-role.kubernetes.io/worker-hp=
+node/api.gpu-ai.bd.f5.com labeled
+╭─    ~/volterra                                                                                                                                                        ✔  base   f5-demo/api-gpu-ai-bd-f5-com:6443/kube:admin/f5-demo ⎈
+╰─ oc get node
+NAME                   STATUS   ROLES                                   AGE    VERSION
+api.gpu-ai.bd.f5.com   Ready    control-plane,master,worker,worker-hp   221d   v1.31.6
+```
+
 2. **Apply Tuned and MachineConfigPool (MCP):**
    - `hugepages-tuned-boottime.yaml`
+```bash 
+apiVersion: tuned.openshift.io/v1
+kind: Tuned
+metadata:
+  name: hugepages
+  namespace: openshift-cluster-node-tuning-operator
+spec:
+  profile:
+  - data: |
+      [main]
+      summary=Boot time configuration for hugepages
+      include=openshift-node
+      [bootloader]
+      cmdline_openshift_node_hugepages=hugepagesz=2M hugepages=1792
+    name: openshift-node-hugepages
+
+  recommend:
+  - machineConfigLabels:
+      machineconfiguration.openshift.io/role: "worker-hp"
+    priority: 30
+    profile: openshift-node-hugepages
+```
+
    - `hugepages-mcp.yaml`
+```bash 
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfigPool
+metadata:
+  name: worker-hp
+  labels:
+    worker-hp: ""
+spec:
+  machineConfigSelector:
+    matchExpressions:
+      - {key: machineconfiguration.openshift.io/role, operator: In, values: [worker,worker-hp]}
+  nodeSelector:
+    matchLabels:
+      node-role.kubernetes.io/worker-hp: ""
+```
+
 3. **Verify:** Confirm HugePages allocation on labeled node.
 
 ---
@@ -77,6 +125,26 @@ Download from GitLab:
 ### 2.2  Update Manifest for Environment
 For this single-site deployment, the manifest `ce_ocp_gpu-ai.yml` was customized.  
 The standard manifest includes optional **NodePort definitions** for multi-cluster configurations, which can be safely **commented out or removed**.
+
+```bash
+╰─ diff ce_k8s\ \(2\).yml ce_ocp_gpu-ai.yml
+144c144
+<     ClusterName: <cluster name>
+---
+>     ClusterName: ericji-gpu-ai-pod
+149c149
+<     Latitude: <latitude>
+---
+>     Latitude: 44
+151c151
+<     Longitude: <longitude>
+---
+>     Longitude: -122
+157c157
+<     Token: <token>
+---
+>     Token: xxxx
+```
 
 📸 *(Insert screenshot of F5XC Console showing Site Token generation here.)*
 
@@ -118,6 +186,10 @@ varvpm-vp-manager-0      Bound    pvc-7f89642f-c304-4ee3-b797-042304c58eef   1Gi
 ---
 
 ### 2.4  Approve Registration on F5XC Console
+
+Log into Console to accept the site registrations.
+
+
 After deployment, monitor F5XC pods:
 ```bash
 oc -n ves-system get pod -o wide
@@ -174,8 +246,7 @@ oc -n ves-system edit deploy/prometheus
 ### ✅ Final Running Status
 ```bash
 oc get pod -n ves-system -o wide
-```
-```
+
 NAME                          READY   STATUS    RESTARTS   AGE   IP             NODE
 etcd-0                        2/2     Running   0          45m   10.128.1.214   api.gpu-ai.bd.f5.com
 prometheus-57df68c9dd-qnbtn   5/5     Running   0          72s   10.128.1.237   api.gpu-ai.bd.f5.com
@@ -192,8 +263,49 @@ With the F5XC site operational, deploy the **Hipster Shop** application.
 ### 3.1 🏗️ Install Apps
 1. **Create Namespace**
 2. **Deploy Application**
+```bash
+╰─ oc create hipster.yaml -n z-ji
+
+deployment.apps/emailservice created
+service/emailservice created
+deployment.apps/paymentservice created
+service/paymentservice created
+deployment.apps/productcatalogservice created
+service/productcatalogservice created
+deployment.apps/cartservice created
+service/cartservice created
+deployment.apps/currencyservice created
+service/currencyservice created
+deployment.apps/shippingservice created
+service/shippingservice created
+deployment.apps/recommendationservice created
+service/recommendationservice created
+deployment.apps/checkoutservice created
+service/checkoutservice created
+deployment.apps/frontend created
+service/frontend created
+deployment.apps/redis-cart created
+service/redis-cart created
+deployment.apps/loadgenerator created
+```
+
 3. **Note:** Since Mesh runs inside OCP, the `frontend` service can use type `ClusterIP`.
 4. **Verify App Status:** Ensure all pods reach **Running** state.
+```bash
+╰─ oc get pod
+NAME                                     READY   STATUS    RESTARTS      AGE
+cartservice-96976f754-lpt56              1/1     Running   1 (31s ago)   53s
+checkoutservice-7958b7666c-6wdw8         1/1     Running   0             53s
+currencyservice-5d54ccfd8c-9zxkl         1/1     Running   0             53s
+emailservice-6ff8ff9c47-bks7p            1/1     Running   0             53s
+frontend-6f887d4ddf-wcvlp                1/1     Running   0             53s
+loadgenerator-56bb66b7b7-d4jqb           1/1     Running   2 (18s ago)   53s
+paymentservice-df9c45f97-lg6td           1/1     Running   0             53s
+productcatalogservice-79679f9cc5-kqqq7   1/1     Running   0             53s
+recommendationservice-74fbc8f879-4psw4   1/1     Running   0             53s
+redis-cart-79589699d7-9nlpq              1/1     Running   0             53s
+shippingservice-7f6d6cc4d5-9ggf2         1/1     Running   0             53s
+```
 
 ---
 
@@ -210,7 +322,10 @@ Services are advertised using **Origin Pools** and **HTTP Load Balancers** in th
 6. Enter `<servicename>.<namespace>` (e.g., `frontend.z-ji`)
 7. Choose deployed Mesh site
 8. Select **Outside Network**
-9. Click **Save and Exit**
+9. Click **Save and Exit**\
+
+![Hipster Origin pool](images/hipster-origin-pool.png)
+
 
 ---
 
@@ -221,11 +336,16 @@ Services are advertised using **Origin Pools** and **HTTP Load Balancers** in th
 4. Under **Default Origin Servers**, reference the Origin Pool from Step 4.1
 5. Click **Save and Exit**
 
+![Hipster Origin pool](images/hipster-lb.png)
+
 ---
 
 ### 4.3 🔍 Verify Application Accessibility
 After the load balancer deployment:
 - ✅ Application pods appear as origin servers under the **Origin Servers** tab  
 - 🌍 Application is accessible via the configured domain name
+
+![Hipster Origin pool](images/hipster-app.png)
+
 
 📸 *(Insert screenshot of F5XC Console showing Origin Server status here.)*
