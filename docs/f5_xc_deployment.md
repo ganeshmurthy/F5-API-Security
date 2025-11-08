@@ -152,8 +152,7 @@ Resulting ports:
 ### Final Running Status
 ```bash
 oc get pod -n ves-system -o wide
-```
-```
+
 NAME                          READY   STATUS    RESTARTS   AGE   IP             NODE
 etcd-0                        2/2     Running   0          45m   10.128.1.214   api.gpu-ai.bd.f5.com
 prometheus-57df68c9dd-qnbtn   5/5     Running   0          72s   10.128.1.237   api.gpu-ai.bd.f5.com
