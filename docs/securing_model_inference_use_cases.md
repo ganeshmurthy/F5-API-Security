@@ -17,20 +17,32 @@ This lab guides you through configuring **F5 Distributed Cloud (XC) Web Applicat
 
 This step ensures the model serving application is exposed via an F5 Distributed Cloud HTTP Load Balancer (LB).
 
-### Task 0.1: Create vK8s Cluster and Deploy Application
+### Task 0.1: Verify llamastack Service Running in OpenShift
 
-1. **Create vK8s Cluster:**  
-   - Log into the F5 Distributed Cloud Console  
-   - Navigate to **Distributed Apps → Virtual K8s**  
-   - Click **Add Virtual K8s** and name your cluster  
-   - Assign **Virtual Sites** → check `ves-io-all-res`  
-   - Click **Save and Exit** (wait ~1 min for creation)
+1. **Check Service Status**  
+   - Ensure that the `llamastack` service is deployed and running properly within your OpenShift project or namespace.  
+   - Run the following commands to verify that the pods, service, and endpoints are active:
 
-2. **Download Kubeconfig:**  
-   - From the new vK8s cluster dropdown → select **Kubeconfig** to download credentials.
+```bash
+oc get pods -n <your-namespace> | grep llama
+oc get svc -n <your-namespace> | grep llama
+oc get endpoints -n <your-namespace> | grep llama
+```
 
-3. **Deploy the Inference Service:**  
-   - Use `kubectl` and the provided `vk8s-manifest.yaml` (containing deployment for AI inference service `llamastack.f5-ai-security`).
+Expected Output:
+```
+llamastack-f5-ai-security   ClusterIP   10.0.142.12   <none>   8080/TCP   2d
+llamastack-f5-ai-security-7d9c7b9d9f   1/1     Running   0     2d
+```
+
+2. **Confirm Service Accessibility (Internal Test)**  
+   - You can test the inference service directly from within the OpenShift cluster to confirm it’s responding before integrating with F5 Distributed Cloud:
+
+```bash
+oc run test-client --rm -i --tty --image=registry.access.redhat.com/ubi9/ubi-minimal -- curl -s http://llamastack-f5-ai-security.<your-namespace>.svc.cluster.local:8080/v1/openai/v1/models | jq
+```
+
+Expected JSON output should show available models such as `Llama-3.2-1B-Instruct-quantized.w8a8`.
 
 ### Task 0.2: Set up the HTTP Load Balancer
 
@@ -42,10 +54,17 @@ This step ensures the model serving application is exposed via an F5 Distributed
    - Add Item → name the pool  
 4. **Configure Origin Server:**
    - Type: *K8s Service Name of Origin Server on given Sites*  
-   - Service Name: `llamastack.f5-ai-security.yournamespace`  
-   - Virtual Site Type: `shared/ves-io-all-res`  
-   - Network: `vK8s Network on Site`  
-   - Port: `8080`
+   - Service Name: `llamastack.f5-ai-security`  
+   - Virtual Site Type: `yourside`  (ex. `system/ericji-gpu-ai-pod` )
+   - Network: `Outside Network`  
+
+
+![Hipster Origin pool](images/llamastack-origin-pool.png)
+
+   - Port: `8321`
+![Hipster Origin  port](images/hipster-origin-pool_port.png)
+
+
 5. **Save LB:** Continue → Apply → Save and Exit. Record the generated **CNAME**.
 
 ### Verification of Inference Endpoint Access
@@ -57,12 +76,21 @@ Expected Output:
 ```json
 {
   "data": [
-    {"id": "remote-llm/RedHatAI/Llama-3.2-1B-Instruct-quantized.w8a8", "object": "model", "owned_by": "llama_stack"},
-    {"id": "sentence-transformers/all-MiniLM-L6-v2", "object": "model", "owned_by": "llama_stack"}
+    {
+      "id": "remote-llm/RedHatAI/Llama-3.2-1B-Instruct-quantized.w8a8",
+      "object": "model",
+      "created": 1762644418,
+      "owned_by": "llama_stack"
+    },
+    {
+      "id": "sentence-transformers/all-MiniLM-L6-v2",
+      "object": "model",
+      "created": 1762644418,
+      "owned_by": "llama_stack"
+    }
   ]
 }
 ```
-📸 *[Insert Screenshot 1: Load Balancer Verification (Curl Output)]*
 
 ---
 
