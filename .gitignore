@@ -187,3 +187,8 @@ deploy/helm/secrets
 # F5 AI Security Configuration
 # User-specific configuration file (contains sensitive data like API keys)
 deploy/f5-ai-security-values.yaml
+
+# Helm Chart Dependencies
+# These are downloaded by 'helm dependency update' and should not be committed
+deploy/f5-ai-security/charts/*.tgz
+

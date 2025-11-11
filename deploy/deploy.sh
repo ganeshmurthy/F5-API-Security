@@ -24,8 +24,20 @@ usage() {
     echo "PREREQUISITES:"
     echo "  - OpenShift CLI (oc) installed and logged in"
     echo "  - Helm CLI installed"
-    echo "  - Valid Hugging Face token in values file"
-    echo "  - At least one model enabled in values file"
+    echo "  - Valid Hugging Face token (only for internal model deployments)"
+    echo "  - At least one model configured (internal or external)"
+    echo ""
+    echo "LLM CONFIGURATION:"
+    echo "  Configure LLM settings via the web UI after deployment:"
+    echo "  • XC URL: Set the chat completions endpoint"
+    echo "  • Model ID: Specify the model to use"
+    echo "  • API Key: Add authentication if required"
+    echo ""
+    echo "  Available pre-defined models:"
+    echo "  - llama-3-2-1b-instruct, llama-3-1-8b-instruct"
+    echo "  - llama-3-2-3b-instruct, llama-3-3-70b-instruct"
+    echo "  - llama-guard-3-1b, llama-guard-3-8b"
+    echo "  - qwen-2-5-vl-3b-instruct, llama-3-2-1b-instruct-quantized"
     echo ""
 }
 
@@ -133,6 +145,16 @@ check_prerequisites() {
 # Run prerequisites check
 check_prerequisites
 
+# LLM Configuration
+echo ""
+echo "LLM Configuration"
+echo "================="
+echo "LLM settings can be configured via the web UI after deployment:"
+echo "• Navigate to the application URL"
+echo "• Use the left sidebar to configure XC URL, Model ID, and API Key"
+echo "• Changes take effect immediately for your session"
+echo ""
+
 # Check if values file exists, if not copy from example
 if [ ! -f "${VALUES_FILE}" ]; then
     echo "Values file not found: ${VALUES_FILE}"
@@ -143,22 +165,8 @@ if [ ! -f "${VALUES_FILE}" ]; then
     echo ""
 fi
 
-# Check if at least one model is enabled
-echo "Checking if at least one model is enabled..."
-MODEL_ENABLED=$(grep -A 1 "enabled:" "${VALUES_FILE}" | grep -c "enabled: true" || true)
-
-if [ "$MODEL_ENABLED" -eq 0 ]; then
-    echo "ERROR: No models are enabled in ${VALUES_FILE}"
-    echo "Please enable at least one model under global.models by setting 'enabled: true'"
-    echo "Example models available:"
-    echo "  - llama-3-2-1b-instruct"
-    echo "  - llama-3-1-8b-instruct"
-    echo "  - llama-3-2-3b-instruct"
-    echo "  - llama-3-3-70b-instruct"
-    exit 1
-fi
-
-echo "Found ${MODEL_ENABLED} enabled model(s)"
+echo "Ready to deploy with default configuration."
+echo "LLM settings will be configurable via the web UI after deployment."
 
 echo "Updating Helm dependencies..."
 helm dependency update "${CHART_DIR}"
@@ -167,6 +175,11 @@ echo "Creating OpenShift project ${NAMESPACE}..."
 oc new-project "${NAMESPACE}" || echo "Project already exists, continuing..."
 
 echo "Installing f5-ai-security Helm chart with custom values..."
-helm install f5-ai-security "${CHART_DIR}" -f "${VALUES_FILE}" -n "${NAMESPACE}"
+
+# Build Helm command
+HELM_ARGS="-f ${VALUES_FILE}"
+
+# Execute Helm install with all arguments
+helm install f5-ai-security "${CHART_DIR}" $HELM_ARGS -n "${NAMESPACE}"
 
 echo "Deployment complete!"

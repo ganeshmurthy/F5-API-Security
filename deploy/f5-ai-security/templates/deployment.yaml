@@ -40,12 +40,15 @@ spec:
             - name: TAVILY_SEARCH_API_KEY
               value: {{ (index .Values "llama-stack").secrets.TAVILY_SEARCH_API_KEY | quote }}
             {{- end }}
-            {{- if .Values.suggestedQuestions }}
-            - name: f5-ai-security_QUESTION_SUGGESTIONS
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "f5-ai-security.fullname" . }}-suggested-questions
-                  key: f5-ai-security_QUESTION_SUGGESTIONS
+            {{- if .Values.chatEndpoint }}
+            - name: DEFAULT_CHAT_ENDPOINT
+              value: {{ .Values.chatEndpoint.url | quote }}
+            - name: DEFAULT_MODEL
+              value: {{ .Values.chatEndpoint.modelId | quote }}
+            {{- if .Values.chatEndpoint.apiKey }}
+            - name: DEFAULT_API_KEY
+              value: {{ .Values.chatEndpoint.apiKey | quote }}
+            {{- end }}
             {{- end }}
           ports:
             - name: http
