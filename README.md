@@ -42,10 +42,52 @@ This QuickStart shows how to protect AI inference endpoints on Red Hat OpenShift
 
 Key Components
 
-- Red Hat OpenShift AI – Unified MLOps platform for developing and inference models at scale.
-- F5 Distributed Cloud API Security – Provides LLM-aware threat detection, schema validation, and sensitive data redaction.
-- Integration Blueprint – Demonstrates secure model inference across hybrid environments
+- **Red Hat OpenShift AI** – Unified MLOps platform for developing and inference models at scale
+- **F5 Distributed Cloud API Security** – Provides LLM-aware threat detection, schema validation, and sensitive data redaction
+- **Chat Assistant** – AI-powered chat interface 
+- **Direct Mode RAG** – Retrieval-Augmented Generation without agent complexity
+- **Integration Blueprint** – Demonstrates secure model inference across hybrid environments
 
+
+## Quick Start
+
+### Prerequisites
+- OpenShift cluster with RHOAI installed
+- Helm CLI installed
+- `oc` CLI logged into OpenShift
+
+### Deploy
+
+1. **Clone the repository**:
+```bash
+git clone https://github.com/rh-ai-quickstart/F5-API-Security.git
+cd F5-API-Security/deploy
+```
+
+2. **Deploy the application**:
+```bash
+./deploy.sh <namespace>
+```
+
+3. **Access and configure**:
+```bash
+# Get the route URL
+oc get route -n <namespace>
+
+# Open the application URL in your browser
+# Configure LLM settings via the web UI:
+# • XC URL: Set your chat completions endpoint
+# • Model ID: Specify the model to use  
+# • API Key: Add authentication if required
+```
+
+## Document Ingestion
+
+The Ingestion Service automatically processes documents from multiple sources:
+
+### 📄 Supported Sources
+- **PDF Documents**: Upload security policies, manuals, and reports
+- **GitHub Repositories**: Fetch documentation from github repos
 
 ### Architecture diagrams
 ![RAG System Architecture](docs/images/rag-architecture_F5XC.png)
@@ -164,7 +206,7 @@ cd deploy
 Execute the deployment script:
 
 ```bash
-./deploy.sh
+./deploy.sh [namespace]
 ```
 
 If the configuration file is missing, the script creates one and prompts you to edit it:
@@ -178,7 +220,7 @@ Please edit this file to configure your deployment (API keys, model selection, e
 After editing `f5-ai-security-values.yaml`, re-run the script:
 
 ```bash
-./deploy.sh
+./deploy.sh [namespace]
 ```
 
 During installation, the script:
