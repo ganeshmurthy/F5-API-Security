@@ -20,12 +20,15 @@ This lab guides you through configuring **F5 Distributed Cloud (XC) Web Applicat
   - [Task 3 — Simulate a Mitigated Attack via Swagger UI (After WAF)](#task-3--simulate-a-mitigated-attack-via-swagger-ui-after-waf)
   - [Notes \& Troubleshooting](#notes--troubleshooting)
   - [Appendix — Example Minimal Request (cURL)](#appendix--example-minimal-request-curl)
-- [🧾 Use Case 2: Enforcing API Specification, Sensitive Data Detection, and Preventing Shadow APIs](#-use-case-2-enforcing-api-specification-sensitive-data-detection-and-preventing-shadow-apis)
-  - [Task 2.1: Upload API Specification](#task-21-upload-api-specification)
-  - [Task 2.2: Apply API Protection and Deny Shadow APIs](#task-22-apply-api-protection-and-deny-shadow-apis)
-  - [Task 2.3: Traffic Generation and API Confirmation](#task-23-traffic-generation-and-api-confirmation)
-- [⚙️Use Case 3: Preventing Denial of Service (DoS) Attacks via Rate Limiting](#️use-case-3-preventing-denial-of-service-dos-attacks-via-rate-limiting)
+- [🧾Use Case 2: Enforcing API Specification, Sensitive Data Detection, and Preventing Shadow APIs](#use-case-2-enforcing-api-specification-sensitive-data-detection-and-preventing-shadow-apis)
   - [Scenario](#scenario)
+  - [Task 1: Simulate Allowed Access to a Shadow API](#task-1-simulate-allowed-access-to-a-shadow-api)
+  - [Task 2: API Definition](#task-2-api-definition)
+  - [Task 3: Enabling API Inventory and Blocking Shadow APIs](#task-3-enabling-api-inventory-and-blocking-shadow-apis)
+  - [Task 4: Simulate Blocked Access to a Shadow API](#task-4-simulate-blocked-access-to-a-shadow-api)
+  - [Summary](#summary)
+- [⚙️Use Case 3: Preventing Denial of Service (DoS) Attacks via Rate Limiting](#️use-case-3-preventing-denial-of-service-dos-attacks-via-rate-limiting)
+  - [Scenario](#scenario-1)
   - [Task 3.1: Simulate Unmitigated Excessive Requests](#task-31-simulate-unmitigated-excessive-requests)
   - [Task 3.2: Configure Rate Limiting](#task-32-configure-rate-limiting)
   - [Task 3.3: Simulate Mitigated Excessive Requests](#task-33-simulate-mitigated-excessive-requests)
@@ -265,33 +268,87 @@ curl -X 'POST' 'http://vllm-quantized.volt.thebizdevops.net/v1/inference/chat-co
 
 ---
 
-## 🧾 Use Case 2: Enforcing API Specification, Sensitive Data Detection, and Preventing Shadow APIs
+## 🧾Use Case 2: Enforcing API Specification, Sensitive Data Detection, and Preventing Shadow APIs
 
-This use case enforces documented API access only and uses **API Discovery** for continuous visibility.
+### Scenario
+An updated model inference service (KServe/vLLM) introduced a new, unapproved, or unvalidated API endpoint (e.g., a version check endpoint) which was not intended for external release. This unapproved endpoint is considered a **Shadow API**. We need to leverage **F5 Distributed Cloud (XC) API Security** to ensure that only documented, approved endpoints can be consumed, thereby protecting the Model Inference stack.
 
-### Task 2.1: Upload API Specification
+**Prerequisite:** Ensure the HTTP Load Balancer and the LLM inference service are deployed on Red Hat OpenShift AI.
 
-1. Go to **Swagger Files → Add Swagger File** → name it → upload OpenAPI spec → Save  
-2. Go to **API Definition → Add API Definition** → select uploaded spec → Save
+---
 
-### Task 2.2: Apply API Protection and Deny Shadow APIs
+### Task 1: Simulate Allowed Access to a Shadow API
+Verify that the unapproved endpoint is currently accessible before security controls are applied.
 
-1. Edit LB → enable **API Definition** and select your definition  
-2. Under **Common Security Controls**, choose **Apply Specified Service Policies**  
-3. Add Custom Rules:  
-   - **Rule 1:** Deny traffic not matching `/v1/` (invert string matcher)  
-   - **Rule 2:** Allow all others  
-4. Save and Exit
+1. Use a browser or `curl` to test the Shadow API endpoint:  
+   - **Shadow API:** `GET http://vllm-quantized.volt.thebizdevops.net/v1/version`  
+   - The response should return version information, proving that the Shadow API is currently accessible.
 
-*(Note: If “exhausted limits” error appears, request API schema limit increase via support.)*
 
-### Task 2.3: Traffic Generation and API Confirmation
+![Get Version API](images/get_version_api.png)
 
-1. Access LLM docs endpoint → execute API calls and try undocumented paths  
-2. Before policy: vulnerable; after policy: protected  
-3. Review **API Discovery Dashboard** for detected endpoints and sensitive data
+2. *(Optional)* Use the Quickstart’s Swagger UI to confirm the endpoint is exposed:  
+   - **Swagger UI:** `http://vllm-quantized.volt.thebizdevops.net/docs`
 
-📸 *[Insert Screenshot 4: API Discovery Dashboard Highlighting Sensitive Data or Shadow APIs]*
+---
+
+### Task 2: API Definition
+Create an API Definition using the approved OpenAPI specification for the model inference service.
+
+1. Navigate to **Web App & API Protection** in the F5 Distributed Cloud console.
+2. Go to **Manage → API Security → API Definition**.
+3. Click **Add API Definition**.
+![API Definition](images/API_definition.png)
+4. Enter a name (e.g., `model-api-def`).
+5. Under **OpenAPI Specification Files**, click **Add Item**.
+![OpenAPI upload](images/OpenAPI_upload.png)
+1. Upload/select the approved file: `openapi-swagger-v3-fixed2-version.json`.
+2. Click **Save and Exit**.
+
+---
+
+### Task 3: Enabling API Inventory and Blocking Shadow APIs
+Enable API Inventory & Discovery on the Load Balancer fronting the inference endpoint.
+
+1. Go to **Manage → Load Balancers → HTTP Load Balancers**.
+2. Locate the Load Balancer for the LLM service → click **… → Manage Configuration**.
+3. Click **Edit Configuration**.
+4. Select **API Protection** from the left navigation.
+5. In the first API Definition section, select **Enable**.
+6. In the second API Definition section, select the definition created in Task 2.
+![API Protection](images/API_protection.png)
+
+7. Under **Validation**, choose **API Inventory**, then click **View Configuration**.
+   ![API validation](images/API_validation.png)
+8. Change **Fall Through Mode** to **Custom**.
+9.  Under **Custom Fall Through Rule List**, choose **Configure**.
+       ![Fall through](images/fall_through.png)
+
+10. Add an item with:
+    - **Name:** block-shadow  
+    - **Action:** Block  
+    - **Type:** Base Path  
+    - **Base Path:** `/v1`  
+       ![Block shadow](images/block_shadow.png)
+
+11. Click **Apply**.
+12. Select **Other Settings**, then **Save and Exit**.
+
+---
+
+### Task 4: Simulate Blocked Access to a Shadow API
+After enforcing the API spec, the Shadow API should now be blocked.
+
+1. Test using browser or `curl`:  
+   - `GET http://vllm-quantized.volt.thebizdevops.net/v1/version`
+2. The request should now be blocked, confirming that undocumented/unauthorized endpoints are prevented.
+    ![Block 403](images/get_version_api_403.png)
+---
+
+### Summary
+Enforcing the API specification acts like a strict **security manifest** for a production line. Anything not explicitly approved in the OpenAPI file (`openapi-swagger-v3-fixed2-version.json`) is immediately rejected by **F5 API Security**, preventing the exposure of Shadow APIs.
+
+
 
 ---
 
